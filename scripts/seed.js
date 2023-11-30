@@ -1,4 +1,6 @@
-const { db } = require('@vercel/postgres');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
 const {
   invoices,
   customers,
@@ -160,15 +162,59 @@ async function seedRevenue(client) {
   }
 }
 
+const upsertModel = async (model, data, uniqueCondation) => {
+  console.log(uniqueCondation);
+  const upsertPromises = data.map((item) => {
+    if (item.date) {
+      item.date = new Date(item.date);
+    }
+    return model.upsert({
+      where: uniqueCondation(item), // Specify the unique identifier for the record
+      update: item, // Data to be updated if the record exists
+      create: item, // Data to be created if the record doesn't exist
+    });
+  });
+
+  const insertedData = await Promise.all(upsertPromises);
+  console.log('Upserted users:', insertedData);
+  return insertedData;
+};
+
 async function main() {
-  const client = await db.connect();
+  const client = await prisma.$connect();
 
-  await seedUsers(client);
-  await seedCustomers(client);
-  await seedInvoices(client);
-  await seedRevenue(client);
+  await upsertModel(prisma.user, users, (item) => {
+    return { id: item.id };
+  });
+  await upsertModel(prisma.customer, customers, (item) => {
+    return { id: item.id };
+  });
+  await upsertModel(prisma.invoice, invoices, (item) => {
+    return {
+      id: 'kkklsdkfl',
+      customer_id: item.customer_id,
+      date: { equals: item.date ? new Date(item.date) : null },
+    };
+  });
+  await upsertModel(prisma.revenue, revenue, (item) => {
+    return { month: item.month };
+  });
+  // const insertedCustomers = await prisma.customer.createMany({
+  //   data: customers,
+  // });
+  // console.log(`Seeded ${insertedCustomers.length} customers`);
 
-  await client.end();
+  // const insertedInvoices = await prisma.invoice.createMany({
+  //   data: invoices,
+  // });
+  // console.log(`Seeded ${insertedInvoices.length} invoices`);
+
+  // const insertedRevenue = await prisma.revenue.createMany({
+  //   data: revenues,
+  // });
+  // console.log(`Seeded ${insertedRevenue.length} revenues`);
+
+  // await client.end();
 }
 
 main().catch((err) => {
