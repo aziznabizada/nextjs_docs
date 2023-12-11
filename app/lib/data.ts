@@ -1,20 +1,23 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+import { unstable_noStore as noStore } from 'next/cache';
 
-import {
-  CustomerField,
-  CustomersTableType,
-  InvoiceForm,
-  InvoicesTable,
-  LatestInvoiceRaw,
-  User,
-  Revenue,
-} from './definitions';
+// import {
+//   CustomerField,
+//   CustomersTableType,
+//   InvoiceForm,
+//   InvoicesTable,
+//   LatestInvoiceRaw,
+//   User,
+//   Revenue,
+// } from './definitions';
 import { formatCurrency } from './utils';
+import { Invoice, Revenue, Customer } from './definitions';
 
 export async function fetchRevenue() {
+  noStore();
   try {
-    const data = await prisma.revenue.findMany();
+    const data = await prisma.Revenue.findMany();
     return data;
   } catch (error) {
     console.error('Database Error:', error);
@@ -23,8 +26,9 @@ export async function fetchRevenue() {
 }
 
 export async function fetchLatestInvoices() {
+  noStore();
   try {
-    const data = await prisma.invoice.findMany({
+    const data = await prisma.Invoice.findMany({
       take: 5, // Limit the number of records to 10
       orderBy: { date: 'desc' },
       include: {
@@ -43,40 +47,30 @@ export async function fetchLatestInvoices() {
   }
 }
 
-// export async function fetchCardData() {
-//   try {
-//     // You can probably combine these into a single SQL query
-//     // However, we are intentionally splitting them to demonstrate
-//     // how to initialize multiple queries in parallel with JS.
-//     const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`;
-//     const customerCountPromise = sql`SELECT COUNT(*) FROM customers`;
-//     const invoiceStatusPromise = sql`SELECT
-//          SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
-//          SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
-//          FROM invoices`;
+export async function fetchCardData() {
+  try {
+    const numberOfInvoices = await prisma.Invoice.count();
+    const numberOfCustomers = await prisma.Customer.count();
+    const invoiceStatusPromise = await prisma.invoice.groupBy({
+      by: ['status'],
+      _sum: {
+        amount: true,
+      },
+    });
+    const totalPaidInvoices = invoiceStatusPromise[0]._sum.amount;
+    const totalPendingInvoices = invoiceStatusPromise[1]._sum.amount;
 
-//     const data = await Promise.all([
-//       invoiceCountPromise,
-//       customerCountPromise,
-//       invoiceStatusPromise,
-//     ]);
-
-//     const numberOfInvoices = Number(data[0].rows[0].count ?? '0');
-//     const numberOfCustomers = Number(data[1].rows[0].count ?? '0');
-//     const totalPaidInvoices = formatCurrency(data[2].rows[0].paid ?? '0');
-//     const totalPendingInvoices = formatCurrency(data[2].rows[0].pending ?? '0');
-
-//     return {
-//       numberOfCustomers,
-//       numberOfInvoices,
-//       totalPaidInvoices,
-//       totalPendingInvoices,
-//     };
-//   } catch (error) {
-//     console.error('Database Error:', error);
-//     throw new Error('Failed to fetch card data.');
-//   }
-// }
+    return {
+      numberOfCustomers,
+      numberOfInvoices,
+      totalPaidInvoices,
+      totalPendingInvoices,
+    };
+  } catch (error) {
+    console.error('Database Error:', error);
+    throw new Error('Failed to fetch card data.');
+  }
+}
 
 // const ITEMS_PER_PAGE = 6;
 // export async function fetchFilteredInvoices(
