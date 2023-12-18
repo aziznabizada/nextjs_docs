@@ -17,6 +17,7 @@ import { Invoice, Revenue, Customer } from './definitions';
 export async function fetchRevenue() {
   noStore();
   try {
+    await new Promise((resolve, reject) => setTimeout(resolve, 3000));
     const data = await prisma.Revenue.findMany();
     return data;
   } catch (error) {
@@ -28,6 +29,7 @@ export async function fetchRevenue() {
 export async function fetchLatestInvoices() {
   noStore();
   try {
+    await new Promise((resolve, reject) => setTimeout(resolve, 5000));
     const data = await prisma.Invoice.findMany({
       take: 5, // Limit the number of records to 10
       orderBy: { date: 'desc' },
